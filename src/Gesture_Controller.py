@@ -581,5 +581,5 @@ class GestureController:
         cv2.destroyAllWindows()
 
 # To run directly, uncomment the lines below:
-gc1 = GestureController()
-gc1.start()
+#gc1 = GestureController()
+#gc1.start()

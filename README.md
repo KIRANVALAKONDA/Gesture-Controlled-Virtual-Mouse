@@ -4,7 +4,7 @@ A comprehensive gesture-controlled virtual mouse system that allows users to con
 ## Features
 
 ### Gesture Control
-- **Mouse Movement**: Use V-gesture to move the cursor
+- **Mouse Movement**: Use V-gesture to move the cursor (with optional smoothing for stability)
 - **Left Click**: MID gesture while V-gesture is active
 - **Right Click**: INDEX gesture while V-gesture is active
 - **Double Click**: TWO_FINGER_CLOSED gesture while V-gesture is active
@@ -17,11 +17,13 @@ A comprehensive gesture-controlled virtual mouse system that allows users to con
 ### Voice Assistant (Proton)
 - Voice-activated commands for system control
 - File navigation and management
-- Web search and location lookup
+- Web search, location lookup, and Wikipedia search
 - System information (date, time)
 - Launch/stop gesture recognition
 - Copy/paste operations
 - Wake up/sleep functionality
+- Repeat last response
+- Help command for available features
 
 ## Requirements
 
@@ -51,7 +53,10 @@ python src/Proton.py
 ## Usage
 
 ### Starting the System
-Run `python src/Proton.py` to start the voice assistant and web interface.
+Run `python src/Proton.py` to start the voice assistant and web interface. The web interface will open in a Chrome window for text-based interaction with Proton.
+
+### Web Interface
+The application includes a web-based chat interface built with Eel, allowing users to interact with Proton via text input in addition to voice commands. The interface displays conversation history and provides an alternative input method.
 
 ### Gesture Control
 1. Say "Proton launch gesture recognition" to start gesture control
@@ -64,8 +69,11 @@ Run `python src/Proton.py` to start the voice assistant and web interface.
 - **Basic Info**: "Proton date", "Proton time"
 - **Web Search**: "Proton search [query]"
 - **Location**: "Proton location" (then speak the place)
+- **Wikipedia Search**: "Proton wikipedia [topic]"
 - **File Navigation**: "Proton list" (lists root directory), "Proton open [number]", "Proton back"
 - **System Control**: "Proton copy", "Proton paste"
+- **Repeat**: "Proton repeat" (repeats last response)
+- **Help**: "Proton help" (lists available commands)
 - **Exit**: "Proton exit"
 
 ## Supported Gestures
@@ -105,6 +113,3 @@ Run `python src/Proton.py` to start the voice assistant and web interface.
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
