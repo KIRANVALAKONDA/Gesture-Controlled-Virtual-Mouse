@@ -15,6 +15,7 @@ import wikipedia
 import Gesture_Controller
 #import Gesture_Controller_Gloved as Gesture_Controller
 import app
+from queue import Queue
 from threading import Thread
 
 
@@ -23,9 +24,27 @@ today = date.today()
 r = sr.Recognizer()
 keyboard = Controller()
 engine = pyttsx3.init('sapi5')
-engine = pyttsx3.init()
 voices = engine.getProperty('voices')
 engine.setProperty('voice', voices[0].id)
+
+# Thread-safe TTS queue and worker
+tts_queue = Queue()
+def tts_worker():
+    while True:
+        text = tts_queue.get()
+        if text is None:
+            break
+        try:
+            engine.say(text)
+            engine.runAndWait()
+            # Add a small delay to ensure TTS engine is ready for next message
+            time.sleep(0.1)
+        except Exception as e:
+            print(f"TTS error: {e}")
+        tts_queue.task_done()
+
+tts_thread = Thread(target=tts_worker, daemon=True)
+tts_thread.start()
 
 # ----------------Variables------------------------
 file_exp_status = False
@@ -35,11 +54,10 @@ is_awake = True  #Bot status
 
 # ------------------Functions----------------------
 def reply(audio):
-    app.ChatBot.addAppMsg(audio)
-
     print(audio)
-    engine.say(audio)
-    engine.runAndWait()
+    tts_queue.put(audio)
+    # Ensure chat message is always updated after TTS is queued
+    app.ChatBot.addAppMsg(audio)
 
 
 def wish():
@@ -79,38 +97,50 @@ def record_audio():
 # Executes Commands (input: string)
 def respond(voice_data):
     global file_exp_status, files, is_awake, path
+
     print(voice_data)
-    voice_data.replace('proton','')
+    # Remove 'proton' from the command for easier matching
+    voice_data = voice_data.replace('proton', '').strip()
     app.eel.addUserMsg(voice_data)
 
-    if is_awake==False:
+    if is_awake == False:
         if 'wake up' in voice_data:
             is_awake = True
             wish()
+        return
 
     # STATIC CONTROLS
-    elif 'hello' in voice_data:
+    if 'hello' in voice_data:
         wish()
+        return
 
-    elif 'what is your name' in voice_data:
+    if 'what is your name' in voice_data:
         reply('My name is Proton!')
+        return
 
-    elif 'date' in voice_data:
+    if 'date' in voice_data:
         reply(today.strftime("%B %d, %Y"))
+        return
 
-    elif 'time' in voice_data:
+    if 'time' in voice_data:
         reply(str(datetime.datetime.now()).split(" ")[1].split('.')[0])
+        return
 
-    elif 'search' in voice_data:
-        reply('Searching for ' + voice_data.split('search')[1])
-        url = 'https://google.com/search?q=' + voice_data.split('search')[1]
+    if 'search' in voice_data:
+        try:
+            search_term = voice_data.split('search', 1)[1].strip()
+        except IndexError:
+            search_term = ''
+        reply('Searching for ' + search_term)
+        url = 'https://google.com/search?q=' + search_term
         try:
             webbrowser.get().open(url)
             reply('This is what I found Sir')
         except:
             reply('Please check your Internet')
+        return
 
-    elif 'location' in voice_data:
+    if 'location' in voice_data:
         reply('Which place are you looking for ?')
         temp_audio = record_audio()
         app.eel.addUserMsg(temp_audio)
@@ -121,83 +151,89 @@ def respond(voice_data):
             reply('This is what I found Sir')
         except:
             reply('Please check your Internet')
+        return
 
-    elif ('bye' in voice_data) or ('by' in voice_data):
+    if ('bye' in voice_data) or ('by' in voice_data):
         reply("Good bye Sir! Have a nice day.")
         is_awake = False
+        return
 
-    elif ('exit' in voice_data) or ('terminate' in voice_data):
+    if ('exit' in voice_data) or ('terminate' in voice_data):
         if Gesture_Controller.GestureController.gc_mode:
             Gesture_Controller.GestureController.gc_mode = 0
         app.ChatBot.close()
-        #sys.exit() always raises SystemExit, Handle it in main loop
         sys.exit()
-        
-    
+        return
+
     # DYNAMIC CONTROLS
-    elif 'launch gesture recognition' in voice_data:
+    if 'launch gesture recognition' in voice_data:
         if Gesture_Controller.GestureController.gc_mode:
             reply('Gesture recognition is already active')
         else:
             gc = Gesture_Controller.GestureController()
-            t = Thread(target = gc.start)
+            t = Thread(target=gc.start)
             t.start()
             reply('Launched Successfully')
+        return
 
-    elif ('stop gesture recognition' in voice_data) or ('top gesture recognition' in voice_data):
+    if ('stop gesture recognition' in voice_data) or ('top gesture recognition' in voice_data):
         if Gesture_Controller.GestureController.gc_mode:
             Gesture_Controller.GestureController.gc_mode = 0
             reply('Gesture recognition stopped')
         else:
             reply('Gesture recognition is already inactive')
-        
-    elif 'copy' in voice_data:
+        return
+
+    if 'copy' in voice_data:
         with keyboard.pressed(Key.ctrl):
             keyboard.press('c')
             keyboard.release('c')
         reply('Copied')
-          
-    elif 'page' in voice_data or 'pest'  in voice_data or 'paste' in voice_data:
+        return
+
+    if 'page' in voice_data or 'pest' in voice_data or 'paste' in voice_data:
         with keyboard.pressed(Key.ctrl):
             keyboard.press('v')
             keyboard.release('v')
         reply('Pasted')
-        
+        return
+
     # File Navigation (Default Folder set to C://)
-    elif 'list' in voice_data:
+    if 'list' in voice_data:
         counter = 0
         path = 'C://'
         files = listdir(path)
         filestr = ""
         for f in files:
-            counter+=1
+            counter += 1
             print(str(counter) + ':  ' + f)
             filestr += str(counter) + ':  ' + f + '<br>'
         file_exp_status = True
         reply('These are the files in your root directory')
         app.ChatBot.addAppMsg(filestr)
-        
-    elif file_exp_status == True:
-        counter = 0   
+        return
+
+    if file_exp_status == True:
+        counter = 0
         if 'open' in voice_data:
-            if isfile(join(path,files[int(voice_data.split(' ')[-1])-1])):
-                os.startfile(path + files[int(voice_data.split(' ')[-1])-1])
-                file_exp_status = False
-            else:
-                try:
-                    path = path + files[int(voice_data.split(' ')[-1])-1] + '//'
+            try:
+                idx = int(voice_data.split(' ')[-1]) - 1
+                if isfile(join(path, files[idx])):
+                    os.startfile(path + files[idx])
+                    file_exp_status = False
+                else:
+                    path = path + files[idx] + '//'
                     files = listdir(path)
                     filestr = ""
                     for f in files:
-                        counter+=1
+                        counter += 1
                         filestr += str(counter) + ':  ' + f + '<br>'
                         print(str(counter) + ':  ' + f)
                     reply('Opened Successfully')
                     app.ChatBot.addAppMsg(filestr)
-                    
-                except:
-                    reply('You do not have permission to access this folder')
-                                    
+            except:
+                reply('You do not have permission to access this folder')
+            return
         if 'back' in voice_data:
             filestr = ""
             if path == 'C://':
@@ -208,14 +244,15 @@ def respond(voice_data):
                 path += '//'
                 files = listdir(path)
                 for f in files:
-                    counter+=1
+                    counter += 1
                     filestr += str(counter) + ':  ' + f + '<br>'
                     print(str(counter) + ':  ' + f)
                 reply('ok')
                 app.ChatBot.addAppMsg(filestr)
-                   
-    else: 
-        reply('I am not functioned to do this !')
+            return
+
+    # If no command matched
+    reply('I am not functioned to do this !')
 
 # ------------------Driver Code--------------------
 
@@ -230,24 +267,30 @@ wish()
 voice_data = None
 while True:
     if app.ChatBot.isUserInput():
-        #take input from GUI
+        # take input from GUI
         voice_data = app.ChatBot.popUserInput()
+        print(f"GUI input: {voice_data}")
     else:
-        #take input from Voice
+        # take input from Voice
         voice_data = record_audio()
+        print(f"Voice input: {voice_data}")
 
-    #process voice_data
-    if 'proton' in voice_data:
+    # process voice_data
+    if voice_data and voice_data.strip():
         try:
-            #Handle sys.exit()
             respond(voice_data)
         except SystemExit:
             reply("Exit Successfull")
             break
-        except:
-            #some other exception got raised
-            print("EXCEPTION raised while closing.") 
+        except Exception as e:
+            print(f"EXCEPTION raised while closing: {e}")
             break
+    else:
+        print("No valid input received.")
+
+# Graceful shutdown for TTS thread
+tts_queue.put(None)
+tts_thread.join()
         
 
 

@@ -159,10 +159,11 @@ class HandRecog:
             dist = self.get_signed_dist(point[:2])
             dist2 = self.get_signed_dist(point[1:])
             
+
             try:
                 ratio = round(dist/dist2,1)
             except:
-                ratio = round(dist1/0.01,1)
+                ratio = round(dist/0.01,1)
 
             self.finger = self.finger << 1
             if ratio > 0.5 :
@@ -327,38 +328,22 @@ class Controller:
     # Stabilize cursor by Dampening
     def get_position(hand_result):
         """
-        returns coordinates of current hand position.
-
-        Locates hand to get cursor position also stabilize cursor by 
-        dampening jerky motion of hand.
-
-        Returns
-        -------
-        tuple(float, float)
+        Returns screen coordinates mapped directly from hand position, with optional smoothing.
         """
         point = 9
-        position = [hand_result.landmark[point].x ,hand_result.landmark[point].y]
-        sx,sy = pyautogui.size()
-        x_old,y_old = pyautogui.position()
-        x = int(position[0]*sx)
-        y = int(position[1]*sy)
+        position = [hand_result.landmark[point].x, hand_result.landmark[point].y]
+        sx, sy = pyautogui.size()
+        # Direct mapping
+        x = int(position[0] * sx)
+        y = int(position[1] * sy)
+        # Optional: simple smoothing (weighted average)
+        smoothing = 0.7  # 0 = no smoothing, 0.9 = very slow
         if Controller.prev_hand is None:
-            Controller.prev_hand = x,y
-        delta_x = x - Controller.prev_hand[0]
-        delta_y = y - Controller.prev_hand[1]
-
-        distsq = delta_x**2 + delta_y**2
-        ratio = 1
-        Controller.prev_hand = [x,y]
-
-        if distsq <= 25:
-            ratio = 0
-        elif distsq <= 900:
-            ratio = 0.07 * (distsq ** (1/2))
-        else:
-            ratio = 2.1
-        x , y = x_old + delta_x*ratio , y_old + delta_y*ratio
-        return (x,y)
+            Controller.prev_hand = [x, y]
+        x_smooth = int(Controller.prev_hand[0] * smoothing + x * (1 - smoothing))
+        y_smooth = int(Controller.prev_hand[1] * smoothing + y * (1 - smoothing))
+        Controller.prev_hand = [x_smooth, y_smooth]
+        return (x_smooth, y_smooth)
 
     def pinch_control_init(hand_result):
         """Initializes attributes for pinch gesture."""
@@ -595,6 +580,6 @@ class GestureController:
         GestureController.cap.release()
         cv2.destroyAllWindows()
 
-# uncomment to run directly
-# gc1 = GestureController()
-# gc1.start()
+# To run directly, uncomment the lines below:
+gc1 = GestureController()
+gc1.start()
